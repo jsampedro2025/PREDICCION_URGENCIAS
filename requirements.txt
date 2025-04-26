@@ -1,0 +1,8 @@
+streamlit
+pandas
+numpy
+pickle
+requests
+datetime
+warnings
+openpyxl  # Si trabajas con archivos .xlsx

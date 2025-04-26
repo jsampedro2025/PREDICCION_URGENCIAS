@@ -16,7 +16,7 @@ warnings.simplefilter("ignore", category=FutureWarning)
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 # ---------- CONFIGURACIÓN DE RUTAS ----------
-BASE_DIR = "."  # El directorio actual donde se ejecuta el script
+BASE_DIR = "https://github.com/jsampedro2025/PREDICCION_URGENCIAS/blob/main/"  # El directorio actual donde se ejecuta el script
 MODEL_PATH = glob.glob(os.path.join(BASE_DIR, "*.pkl"))[0]
 HIST_PATH = glob.glob(os.path.join(BASE_DIR, "*.xls*"))[0]
 NEW_DATA_PATH = os.path.join(BASE_DIR, "Nuevas_Predicciones.xlsx")

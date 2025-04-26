@@ -16,9 +16,16 @@ warnings.simplefilter("ignore", category=FutureWarning)
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 # ---------- CONFIGURACIÓN DE RUTAS ----------
-BASE_DIR = "https://github.com/jsampedro2025/PREDICCION_URGENCIAS/tree/main"
-MODEL_PATH = "https://github.com/jsampedro2025/PREDICCION_URGENCIAS/tree/main/modelo_prediccion_urgencias.pkl"
-HIST_PATH = os.path.join(BASE_DIR, "DATASET_MEJORADO.xlsx")
+# BASE_DIR:  ¡El directorio actual! (La raíz del repositorio)
+BASE_DIR = "."
+
+# MODEL_PATH:  Ruta al archivo .pkl (nombre exacto)
+MODEL_PATH = os.path.join(BASE_DIR, "MODELO_PREDICCION_DE_URGENCIAS.pkl")
+
+# HIST_PATH: Ruta al archivo de datos históricos (nombre exacto o patrón)
+HIST_PATH = os.path.join(BASE_DIR, "DATASET_MEJORADO.xlsx") 
+
+# NEW_DATA_PATH: Ruta al archivo de nuevas predicciones (nombre exacto)
 NEW_DATA_PATH = os.path.join(BASE_DIR, "Nuevas_Predicciones.xlsx")
 
 # ---------- FUNCIONES CON CACHEO ----------

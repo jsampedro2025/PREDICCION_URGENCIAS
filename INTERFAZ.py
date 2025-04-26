@@ -20,7 +20,7 @@ st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 BASE_DIR = "."
 
 # MODEL_PATH:  Ruta al archivo .pkl (nombre exacto)
-MODEL_PATH = os.path.join(BASE_DIR, "MODELO_PREDICCION_DE_URGENCIAS.pkl")
+MODEL_PATH = os.path.join(BASE_DIR, "modelo_prediccion_urgencias.pkl")
 
 # HIST_PATH: Ruta al archivo de datos históricos (nombre exacto o patrón)
 HIST_PATH = os.path.join(BASE_DIR, "DATASET_MEJORADO.xlsx") 

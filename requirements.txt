@@ -2,6 +2,4 @@ streamlit
 pandas
 numpy
 requests
-datetime
-warnings
-openpyxl  # Si trabajas con archivos .xlsx
+openpyxl

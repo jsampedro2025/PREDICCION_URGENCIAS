@@ -17,7 +17,7 @@ st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 # ---------- CONFIGURACIÓN DE RUTAS ----------
 BASE_DIR = "https://github.com/jsampedro2025/PREDICCION_URGENCIAS/tree/main"
-MODEL_PATH = glob.glob(os.path.join(BASE_DIR, "*.pkl"))[0]
+MODEL_PATH = "https://github.com/jsampedro2025/PREDICCION_URGENCIAS/tree/main/modelo_prediccion_urgencias.pkl"
 HIST_PATH = os.path.join(BASE_DIR, "DATASET_MEJORADO.xlsx")
 NEW_DATA_PATH = os.path.join(BASE_DIR, "Nuevas_Predicciones.xlsx")
 

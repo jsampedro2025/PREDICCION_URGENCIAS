@@ -16,7 +16,7 @@ warnings.simplefilter("ignore", category=FutureWarning)
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 # ---------- CONFIGURACIÓN DE RUTAS ----------
-BASE_DIR = "."
+BASE_DIR = "https://github.com/jsampedro2025/PREDICCION_URGENCIAS/tree/main"
 MODEL_PATH = glob.glob(os.path.join(BASE_DIR, "*.pkl"))[0]
 HIST_PATH = os.path.join(BASE_DIR, "DATASET_MEJORADO.xlsx")
 NEW_DATA_PATH = os.path.join(BASE_DIR, "Nuevas_Predicciones.xlsx")

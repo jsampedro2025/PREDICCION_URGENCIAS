@@ -23,7 +23,7 @@ BASE_DIR = "."
 MODEL_PATH = os.path.join(BASE_DIR, "modelo_prediccion_urgencias.pkl")
 
 # HIST_PATH: Ruta al archivo de datos históricos (nombre exacto o patrón)
-HIST_PATH = os.path.join(BASE_DIR, "DATASET_MEJORADO.xlsx") 
+HIST_PATH = os.path.join(BASE_DIR, "DATASET_MEJORADO.xlsx")
 
 # NEW_DATA_PATH: Ruta al archivo de nuevas predicciones (nombre exacto)
 NEW_DATA_PATH = os.path.join(BASE_DIR, "Nuevas_Predicciones.xlsx")
@@ -75,13 +75,13 @@ def compute_meteo_averages(day):
         "Temp_Max": day["temperatura"]["maxima"],
         "Temp_Min": day["temperatura"]["minima"],
         "Precipitacion": safe_avg([p["value"] for p in day.get("probPrecipitacion", [])
-                                    if isinstance(p.get("value"), (int, float))]),
+                                     if isinstance(p.get("value"), (int, float))]),
         "Vel_Media_Viento": safe_avg([v["velocidad"] for v in day.get("viento", [])
-                                        if isinstance(v.get("velocidad"), (int, float))]),
+                                         if isinstance(v.get("velocidad"), (int, float))]),
         "Racha_Maxima": safe_avg([r.get("value") for r in day.get("rachaMax", [])
-                                    if isinstance(r.get("value"), (int, float))]),
+                                     if isinstance(r.get("value"), (int, float))]),
         "Hum_Rel_Med": safe_avg([h["value"] for h in day.get("humedadRelativa", {}).get("dato", [])
-                                   if isinstance(h.get("value"), (int, float))])
+                                  if isinstance(h.get("value"), (int, float))])
     }
 
 # ---------- FUNCIONES DE INTERFAZ ----------
@@ -122,13 +122,13 @@ def nueva_prediccion(modelo, nuevas_predicciones, meteo_days):
 
     with col3:
         gripe = st.radio("¿Hay casos de Gripe? (0=No, 1=Sí)", options=[0, 1],
-                        index=0, format_func=lambda x: "No" if x == 0 else "Sí")
+                         index=0, format_func=lambda x: "No" if x == 0 else "Sí")
         covid = st.radio("¿Hay casos de Covid? (0=No, 1=Sí)", options=[0, 1],
-                        index=0, format_func=lambda x: "No" if x == 0 else "Sí")
+                         index=0, format_func=lambda x: "No" if x == 0 else "Sí")
 
     with col4:
         brote = st.radio("¿Existe un brote epidémico? (0=No, 1=Sí)", options=[0, 1],
-                        index=0, format_func=lambda x: "No" if x == 0 else "Sí")
+                         index=0, format_func=lambda x: "No" if x == 0 else "Sí")
 
     # Obtener variables meteorológicas para la fecha seleccionada
     day_m = next((d for d in meteo_days if datetime.fromisoformat(d["fecha"]).date() == fecha), None)
@@ -165,8 +165,16 @@ def nueva_prediccion(modelo, nuevas_predicciones, meteo_days):
         data["Limite_Superior"] = lim_sup
         data["Valor_Real"] = np.nan
 
+        print(f"Guardando nuevas predicciones en: {NEW_DATA_PATH}")
+        print("Contenido de nuevas_predicciones justo antes de guardar:")
+        print(nuevas_predicciones)
+
         nuevas_predicciones = pd.concat([nuevas_predicciones, pd.DataFrame([data])], ignore_index=True)
-        nuevas_predicciones.to_excel(NEW_DATA_PATH)
+
+        print("Contenido de nuevas_predicciones DESPUÉS de concatenar:")
+        print(nuevas_predicciones)
+
+        nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False para evitar una columna de índice innecesaria
         st.info("Registro guardado en Nuevas_Predicciones.xlsx.")
     return nuevas_predicciones
 
@@ -189,7 +197,12 @@ def ingresar_valor_real(nuevas_predicciones):
                 if valor_real_ingresado is not None:
                     index_original = nuevas_predicciones[nuevas_predicciones["Fecha"] == fecha_editada].index[0]
                     nuevas_predicciones.loc[index_original, "Valor_Real"] = int(round(valor_real_ingresado))
-                    nuevas_predicciones.to_excel(NEW_DATA_PATH)
+
+                    print(f"Guardando nuevas predicciones (después de ingresar valor real) en: {NEW_DATA_PATH}")
+                    print("Contenido de nuevas_predicciones justo antes de guardar:")
+                    print(nuevas_predicciones)
+
+                    nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False
                     st.rerun() # Volvemos a ejecutar la app para actualizar la tabla
 
     edited_df = st.data_editor(
@@ -222,11 +235,16 @@ def actualizar_dataset(nuevas_predicciones, historial):
         return historial, nuevas_predicciones
     if st.button("Actualizar Dataset"):
         historial = pd.concat([historial, nuevas_predicciones], ignore_index=True)
-        historial.to_excel(HIST_PATH)
+        historial.to_excel(HIST_PATH, index=False) # Añadido index=False
         st.success("Dataset principal actualizado. Reentrena el modelo con los nuevos datos.")
         columnas = nuevas_predicciones.columns
         nuevas_predicciones = pd.DataFrame(columns=columnas)
-        nuevas_predicciones.to_excel(NEW_DATA_PATH)
+
+        print(f"Guardando nuevas predicciones (después de actualizar dataset) en: {NEW_DATA_PATH}")
+        print("Contenido de nuevas_predicciones justo antes de guardar:")
+        print(nuevas_predicciones)
+
+        nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False
     return historial, nuevas_predicciones
 
 def ver_calendario_seleccion():
@@ -249,7 +267,7 @@ def main():
     st.title("Sistema de Predicción de Urgencias")
     st.sidebar.title("Menú")
     opcion = st.sidebar.radio("Seleccione acción:",
-                                ["Nueva Predicción", "Ingresar/Ver Valor Real", "Actualizar Dataset", "Ver Calendario y Selección"])
+                                     ["Nueva Predicción", "Ingresar/Ver Valor Real", "Actualizar Dataset", "Ver Calendario y Selección"])
 
     modelo = cargar_modelo()
     historial = cargar_historico()
@@ -257,7 +275,7 @@ def main():
     meteo_days = fetch_forecast()
 
     if opcion == "Nueva Predicción":
-        nueva_prediccion(modelo, nuevas_predicciones, meteo_days)
+        nuevas_predicciones = nueva_prediccion(modelo, nuevas_predicciones, meteo_days)
     elif opcion == "Ingresar/Ver Valor Real":
         nuevas_predicciones = ingresar_valor_real(nuevas_predicciones)
     elif opcion == "Actualizar Dataset":

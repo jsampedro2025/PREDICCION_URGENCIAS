@@ -31,72 +31,107 @@ NEW_DATA_PATH = os.path.join(BASE_DIR, "Nuevas_Predicciones.xlsx")
 # ---------- FUNCIONES CON CACHEO ----------
 @st.cache_resource
 def cargar_modelo():
-    modelo = pickle.load(open(MODEL_PATH, "rb"))
-    return modelo
+    try:
+        modelo = pickle.load(open(MODEL_PATH, "rb"))
+        print(f"Modelo cargado exitosamente desde: {MODEL_PATH}")
+        return modelo
+    except FileNotFoundError:
+        st.error(f"Error: No se encontró el archivo del modelo en: {MODEL_PATH}")
+        return None
+    except Exception as e:
+        st.error(f"Error al cargar el modelo: {e}")
+        return None
 
 @st.cache_data
 def cargar_historico():
-    df = pd.read_excel(HIST_PATH, parse_dates=[0], index_col=0)
-    if "Predicción" not in df.columns:
-        df["Predicción"] = np.nan
-    return df
+    try:
+        df = pd.read_excel(HIST_PATH, parse_dates=[0], index_col=0)
+        if "Predicción" not in df.columns:
+            df["Predicción"] = np.nan
+        print(f"Datos históricos cargados exitosamente desde: {HIST_PATH}")
+        return df
+    except FileNotFoundError:
+        st.error(f"Error: No se encontró el archivo de datos históricos en: {HIST_PATH}")
+        return pd.DataFrame() # Retornar un DataFrame vacío para evitar errores posteriores
+    except Exception as e:
+        st.error(f"Error al cargar los datos históricos: {e}")
+        return pd.DataFrame()
 
 def cargar_nuevas_predicciones(modelo):
-    if os.path.exists(NEW_DATA_PATH):
-        df = pd.read_excel(NEW_DATA_PATH, parse_dates=[0], index_col=0)
-    else:
-        columnas = ["Fecha"] + list(modelo.get_booster().feature_names) + [
-            "Predicción", "Limite_Inferior", "Limite_Superior", "Valor_Real"]
-        df = pd.DataFrame(columns=columnas)
-    return df
+    try:
+        if os.path.exists(NEW_DATA_PATH):
+            df = pd.read_excel(NEW_DATA_PATH, parse_dates=[0], index_col=0)
+            print(f"Nuevas predicciones cargadas desde: {NEW_DATA_PATH}")
+        else:
+            columnas = ["Fecha"] + (list(modelo.get_booster().feature_names) if modelo else []) + [
+                "Predicción", "Limite_Inferior", "Limite_Superior", "Valor_Real"]
+            df = pd.DataFrame(columns=columnas)
+            print(f"Archivo de nuevas predicciones no encontrado. Se creó un nuevo DataFrame.")
+        return df
+    except Exception as e:
+        st.error(f"Error al cargar o crear el archivo de nuevas predicciones: {e}")
+        return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
 def fetch_forecast():
-    # Reemplaza "TU_API_KEY_AQUI" con tu API key real de AEMET.
     API_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkci5zYW1wZWRyb0BnbWFpbC5jb20iLCJqdGkiOiJkMjdkOTM0My1mMWUzLTRjZmUtOTQ4Ni1jNjk2ODZkM2ExZjkiLCJpc3MiOiJBRU1FVCIsImlhdCI6MTc0NTUwNjQ2NywidXNlcklkIjoiZDI3ZDkzNDMtZjFlMy00Y2ZlLTk0ODYtYzY5Njg2ZDNhMWY5Iiwicm9sZSI6IiJ9.6TJxvu7SKU8Mgpu-qQedTRCjv-VzIIPRADlEuHGE9BA"
     LOCALITY_CODE = "20071"  # Tolosa
     base = "https://opendata.aemet.es/opendata/api"
     endpoint = f"{base}/prediccion/especifica/municipio/diaria/{LOCALITY_CODE}"
-    r1 = requests.get(endpoint, params={"api_key": API_KEY})
-    r1.raise_for_status()
-    data_url = r1.json()["datos"]
-    r2 = requests.get(data_url, params={"api_key": API_KEY})
-    r2.raise_for_status()
-    raw = r2.json()
-    if isinstance(raw, list):
-        raw = raw[0]
-    return raw["prediccion"]["dia"]
+    try:
+        r1 = requests.get(endpoint, params={"api_key": API_KEY})
+        r1.raise_for_status()
+        data_url = r1.json().get("datos")
+        if not data_url:
+            st.error("Error: La API de AEMET no devolvió la URL de los datos.")
+            return []
+        r2 = requests.get(data_url, params={"api_key": API_KEY})
+        r2.raise_for_status()
+        raw = r2.json()
+        if isinstance(raw, list):
+            raw = raw[0]
+        print("Datos meteorológicos obtenidos de AEMET.")
+        return raw.get("prediccion", {}).get("dia", [])
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error al conectar con la API de AEMET: {e}")
+        return []
+    except KeyError:
+        st.error("Error: Formato inesperado en la respuesta de la API de AEMET.")
+        return []
+    except Exception as e:
+        st.error(f"Error inesperado al obtener el pronóstico: {e}")
+        return []
 
 def compute_meteo_averages(day):
     def safe_avg(values):
         return sum(values) / len(values) if values else 0.0
     return {
-        "Temp_Media": (day["temperatura"]["maxima"] + day["temperatura"]["minima"]) / 2,
-        "Temp_Max": day["temperatura"]["maxima"],
-        "Temp_Min": day["temperatura"]["minima"],
-        "Precipitacion": safe_avg([p["value"] for p in day.get("probPrecipitacion", [])
-                                     if isinstance(p.get("value"), (int, float))]),
-        "Vel_Media_Viento": safe_avg([v["velocidad"] for v in day.get("viento", [])
-                                         if isinstance(v.get("velocidad"), (int, float))]),
-        "Racha_Maxima": safe_avg([r.get("value") for r in day.get("rachaMax", [])
-                                     if isinstance(r.get("value"), (int, float))]),
-        "Hum_Rel_Med": safe_avg([h["value"] for h in day.get("humedadRelativa", {}).get("dato", [])
-                                  if isinstance(h.get("value"), (int, float))])
+        "Temp_Media": (day.get("temperatura", {}).get("maxima", 0) + day.get("temperatura", {}).get("minima", 0)) / 2,
+        "Temp_Max": day.get("temperatura", {}).get("maxima", 0),
+        "Temp_Min": day.get("temperatura", {}).get("minima", 0),
+        "Precipitacion": safe_avg([p.get("value") for p in day.get("probPrecipitacion", []) if isinstance(p.get("value"), (int, float))]),
+        "Vel_Media_Viento": safe_avg([v.get("velocidad") for v in day.get("viento", []) if isinstance(v.get("velocidad"), (int, float))]),
+        "Racha_Maxima": safe_avg([r.get("value") for r in day.get("rachaMax", []) if isinstance(r.get("value"), (int, float))]),
+        "Hum_Rel_Med": safe_avg([h.get("value") for h in day.get("humedadRelativa", {}).get("dato", []) if isinstance(h.get("value"), (int, float))])
     }
 
 # ---------- FUNCIONES DE INTERFAZ ----------
 def nueva_prediccion(modelo, nuevas_predicciones, meteo_days):
     st.subheader("Nueva Predicción")
 
-    # Extraer fechas disponibles de AEMET
-    forecast_dates = [datetime.fromisoformat(d["fecha"]).date() for d in meteo_days]
-    if forecast_dates:
-        min_date = min(forecast_dates)
-        max_date = max(forecast_dates)
-        st.info(f"El rango de fechas disponible es: {min_date.strftime('%d/%m/%Y')} a {max_date.strftime('%d/%m/%Y')}")
-    else:
-        st.error("No se encontraron datos meteorológicos disponibles.")
+    if not meteo_days:
+        st.error("No se pudieron obtener los datos meteorológicos. La predicción no está disponible.")
         return nuevas_predicciones
+
+    # Extraer fechas disponibles de AEMET
+    forecast_dates = [datetime.fromisoformat(d["fecha"]).date() for d in meteo_days if "fecha" in d]
+    if not forecast_dates:
+        st.error("No se encontraron fechas válidas en los datos meteorológicos.")
+        return nuevas_predicciones
+
+    min_date = min(forecast_dates)
+    max_date = max(forecast_dates)
+    st.info(f"El rango de fechas disponible es: {min_date.strftime('%d/%m/%Y')} a {max_date.strftime('%d/%m/%Y')}")
 
     # Selección de fecha
     fecha = st.date_input("Selecciona la fecha de la predicción",
@@ -131,8 +166,12 @@ def nueva_prediccion(modelo, nuevas_predicciones, meteo_days):
                          index=0, format_func=lambda x: "No" if x == 0 else "Sí")
 
     # Obtener variables meteorológicas para la fecha seleccionada
-    day_m = next((d for d in meteo_days if datetime.fromisoformat(d["fecha"]).date() == fecha), None)
-    meteo = compute_meteo_averages(day_m)
+    day_m = next((d for d in meteo_days if "fecha" in d and datetime.fromisoformat(d["fecha"]).date() == fecha), None)
+    if day_m:
+        meteo = compute_meteo_averages(day_m)
+    else:
+        st.error("No se encontraron datos meteorológicos para la fecha seleccionada.")
+        return nuevas_predicciones
 
     # Construir el diccionario con todas las variables de entrada
     data = {
@@ -151,34 +190,39 @@ def nueva_prediccion(modelo, nuevas_predicciones, meteo_days):
     st.markdown("**Variables usadas para la predicción:**")
     st.table(pd.DataFrame(data, index=[0]))
 
-    if st.button("Realizar Predicción"):
-        df_pred = pd.Series(data).reindex(modelo.get_booster().feature_names).fillna(0).to_frame().T
-        pred = modelo.predict(df_pred)[0]
-        pred_int = int(round(pred))  # Predicción sin decimales
-        margen = int(round(pred_int * 0.1))  # Margen del 10%
-        lim_inf = int(round(pred_int - margen))
-        lim_sup = int(round(pred_int + margen))
-
-        st.success(f"Predicción: {pred_int} ± {margen} (Rango: {lim_inf} - {lim_sup})")
-        data["Predicción"] = pred_int
-        data["Limite_Inferior"] = lim_inf
-        data["Limite_Superior"] = lim_sup
-        data["Valor_Real"] = np.nan
-
-        print(f"Guardando nuevas predicciones en: {NEW_DATA_PATH}")
-        print("Contenido de nuevas_predicciones justo antes de guardar:")
-        print(nuevas_predicciones)
-
-        nuevas_predicciones = pd.concat([nuevas_predicciones, pd.DataFrame([data])], ignore_index=True)
-
-        print("Contenido de nuevas_predicciones DESPUÉS de concatenar:")
-        print(nuevas_predicciones)
-
+    if st.button("Realizar Predicción") and modelo is not None:
         try:
-            nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False para evitar una columna de índice innecesaria
+            df_pred = pd.Series(data).reindex(modelo.get_booster().feature_names).fillna(0).to_frame().T
+            pred = modelo.predict(df_pred)[0]
+            pred_int = int(round(pred))  # Predicción sin decimales
+            margen = int(round(pred_int * 0.1))  # Margen del 10%
+            lim_inf = int(round(pred_int - margen))
+            lim_sup = int(round(pred_int + margen))
+
+            st.success(f"Predicción: {pred_int} ± {margen} (Rango: {lim_inf} - {lim_sup})")
+            data["Predicción"] = pred_int
+            data["Limite_Inferior"] = lim_inf
+            data["Limite_Superior"] = lim_sup
+            data["Valor_Real"] = np.nan
+
+            print(f"Guardando nueva predicción en: {NEW_DATA_PATH}")
+            print("Contenido de nuevas_predicciones justo antes de guardar:")
+            print(nuevas_predicciones)
+
+            nuevas_predicciones = pd.concat([nuevas_predicciones, pd.DataFrame([data])], ignore_index=True)
+
+            print("Contenido de nuevas_predicciones DESPUÉS de concatenar:")
+            print(nuevas_predicciones)
+
+            nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False
             st.info("Registro guardado en Nuevas_Predicciones.xlsx.")
+            return nuevas_predicciones # Asegurarse de retornar el DataFrame actualizado
         except Exception as e:
-            st.error(f"Error al guardar en Nuevas_Predicciones.xlsx: {e}")
+            st.error(f"Error al realizar la predicción: {e}")
+            return nuevas_predicciones
+    elif modelo is None:
+        st.warning("El modelo no se ha cargado correctamente. La predicción no está disponible.")
+        return nuevas_predicciones
     return nuevas_predicciones
 
 def ingresar_valor_real(nuevas_predicciones):
@@ -198,19 +242,21 @@ def ingresar_valor_real(nuevas_predicciones):
                 fecha_editada = pendientes.iloc[index]["Fecha"]
                 valor_real_ingresado = row_data.get("Valor Real")
                 if valor_real_ingresado is not None:
-                    index_original = nuevas_predicciones[nuevas_predicciones["Fecha"] == fecha_editada].index[0]
-                    nuevas_predicciones.loc[index_original, "Valor_Real"] = int(round(valor_real_ingresado))
-
-                    print(f"Guardando nuevas predicciones (después de ingresar valor real) en: {NEW_DATA_PATH}")
-                    print("Contenido de nuevas_predicciones justo antes de guardar:")
-                    print(nuevas_predicciones)
-
                     try:
+                        index_original = nuevas_predicciones[nuevas_predicciones["Fecha"] == fecha_editada].index[0]
+                        nuevas_predicciones.loc[index_original, "Valor_Real"] = int(round(valor_real_ingresado))
+
+                        print(f"Guardando nuevas predicciones (después de ingresar valor real) en: {NEW_DATA_PATH}")
+                        print("Contenido de nuevas_predicciones justo antes de guardar:")
+                        print(nuevas_predicciones)
+
                         nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False
                         st.success(f"Valor real guardado para la fecha: {fecha_editada.strftime('%d/%m/%Y')}")
                         st.rerun() # Volvemos a ejecutar la app para actualizar la tabla
+                    except IndexError:
+                        st.error(f"Error: No se encontró la fecha {fecha_editada} en el DataFrame de nuevas predicciones.")
                     except Exception as e:
-                        st.error(f"Error al guardar en Nuevas_Predicciones.xlsx después de ingresar valor real: {e}")
+                        st.error(f"Error al actualizar el valor real: {e}")
 
     edited_df = st.data_editor(
         pendientes[["Fecha", "Predicción", "Limite_Inferior", "Limite_Superior", "Valor Real"]],
@@ -241,8 +287,8 @@ def actualizar_dataset(nuevas_predicciones, historial):
         st.warning("Se requieren al menos 50 registros completos para actualizar el dataset.")
         return historial, nuevas_predicciones
     if st.button("Actualizar Dataset"):
-        historial = pd.concat([historial, nuevas_predicciones], ignore_index=True)
         try:
+            historial = pd.concat([historial, nuevas_predicciones], ignore_index=True)
             historial.to_excel(HIST_PATH, index=False) # Añadido index=False
             st.success("Dataset principal actualizado. Reentrena el modelo con los nuevos datos.")
             columnas = nuevas_predicciones.columns
@@ -253,8 +299,10 @@ def actualizar_dataset(nuevas_predicciones, historial):
             print(nuevas_predicciones)
 
             nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False
+            return historial, nuevas_predicciones
         except Exception as e:
             st.error(f"Error al actualizar el dataset principal o al limpiar Nuevas_Predicciones.xlsx: {e}")
+            return historial, nuevas_predicciones
     return historial, nuevas_predicciones
 
 def ver_calendario_seleccion():
@@ -289,4 +337,11 @@ def main():
     elif opcion == "Ingresar/Ver Valor Real":
         nuevas_predicciones = ingresar_valor_real(nuevas_predicciones)
     elif opcion == "Actualizar Dataset":
-        historial,
+        historial, nuevas_predicciones = actualizar_dataset(nuevas_predicciones, historial)
+    elif opcion == "Ver Calendario y Selección":
+        ver_calendario_seleccion()
+
+    st.sidebar.info("Esta aplicación se ejecuta en la nube y es accesible desde cualquier dispositivo.")
+
+if __name__ == "__main__":
+    main()

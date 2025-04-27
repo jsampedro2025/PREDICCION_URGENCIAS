@@ -1,5 +1,3 @@
-
-
 import os
 import glob
 import pandas as pd
@@ -10,6 +8,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 import warnings
 from PIL import Image
+from io import BytesIO
 
 # No usaremos components.iframe para la página si se bloquea; en su lugar mostraremos un enlace.
 # Suprimir FutureWarnings para mantener la salida limpia
@@ -19,20 +18,35 @@ warnings.simplefilter("ignore", category=FutureWarning)
 st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 
 # ---------- CONFIGURACIÓN DE RUTAS ----------
-BASE_DIR = r"D:\PREDICCION URGENCIAS\MODELO PREDICCION DE URGENCIAS" # Cambiar a la ruta correcta
-MODEL_PATH = glob.glob(os.path.join(BASE_DIR, "*.pkl"))[0] if glob.glob(os.path.join(BASE_DIR, "*.pkl")) else None
-HIST_PATH = glob.glob(os.path.join(BASE_DIR, "*.xls*"))[0] if glob.glob(os.path.join(BASE_DIR, "*.xls*")) else None
-NEW_DATA_PATH = os.path.join(BASE_DIR, "Nuevas_Predicciones.xlsx")
-PRED_OBS_PATH = os.path.join(BASE_DIR, "Predicciones_Con_Observado.xlsx") # Nuevo path para el archivo con valores observados
+# BASE_DIR = r"D:\PREDICCION URGENCIAS\MODELO PREDICCION DE URGENCIAS" # Cambiar a la ruta correcta
+# MODEL_PATH = glob.glob(os.path.join(BASE_DIR, "*.pkl"))[0] if glob.glob(os.path.join(BASE_DIR, "*.pkl")) else None
+# HIST_PATH = glob.glob(os.path.join(BASE_DIR, "*.xls*"))[0] if glob.glob(os.path.join(BASE_DIR, "*.xls*")) else None
+# NEW_DATA_PATH = os.path.join(BASE_DIR, "Nuevas_Predicciones.xlsx")
+# PRED_OBS_PATH = os.path.join(BASE_DIR, "Predicciones_Con_Observado.xlsx") # Nuevo path para el archivo con valores observados
+
+# Ruta base del repositorio en GitHub
+BASE_URL = "https://raw.githubusercontent.com/jsampedro2025/PREDICCION_URGENCIAS/main/"
+
+# Rutas de los archivos directamente desde GitHub
+MODEL_PATH = BASE_URL + "modelo_entrenado.pkl" # Asegúrate de que el nombre del modelo es correcto
+HIST_PATH = BASE_URL + "historico_urgencias.xlsx" # Asegúrate de que el nombre del archivo histórico es correcto
+NEW_DATA_PATH = BASE_URL + "Nuevas_Predicciones.xlsx" # Asegúrate de que el nombre del archivo de nuevas predicciones es correcto
+PRED_OBS_PATH = "Predicciones_Con_Observado.xlsx" # Este se creará localmente, así que no necesita la ruta de GitHub
 
 # ---------- FUNCIONES CON CACHEO ----------
 @st.cache_resource
 def cargar_modelo():
-    if MODEL_PATH is None:
-        st.error("Error: No se encontró ningún archivo .pkl en la ruta especificada.")
+    if not MODEL_PATH:
+        st.error("Error: No se ha especificado la ruta del archivo del modelo.")
         return None
     try:
-        modelo = pickle.load(open(MODEL_PATH, "rb"))
+        # Si la ruta es una URL, descargar el archivo
+        if MODEL_PATH.startswith("http"):
+            response = requests.get(MODEL_PATH)
+            response.raise_for_status()  # Lanza una excepción para errores HTTP
+            modelo = pickle.load(BytesIO(response.content))
+        else:
+            modelo = pickle.load(open(MODEL_PATH, "rb"))
         print(f"Modelo cargado exitosamente desde: {MODEL_PATH}")
         return modelo
     except FileNotFoundError:
@@ -44,15 +58,24 @@ def cargar_modelo():
 
 @st.cache_data
 def cargar_historico():
-    if HIST_PATH is None:
-        st.error("Error: No se encontró ningún archivo .xls o .xlsx en la ruta especificada.")
+    if not HIST_PATH:
+        st.error("Error: No se ha especificado la ruta del archivo histórico.")
         return pd.DataFrame()
     try:
-        df = pd.read_excel(HIST_PATH, parse_dates=[0], index_col=0)
+        # Si la ruta es una URL, descargar el archivo
+        if HIST_PATH.startswith("http"):
+            response = requests.get(HIST_PATH)
+            response.raise_for_status()
+            df = pd.read_excel(BytesIO(response.content), parse_dates=[0])
+        else:
+            df = pd.read_excel(HIST_PATH, parse_dates=[0])
         if "Predicción" not in df.columns:
             df["Predicción"] = np.nan
         print(f"Datos históricos cargados exitosamente desde: {HIST_PATH}")
         return df
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error al descargar el archivo histórico: {e}")
+        return pd.DataFrame()
     except FileNotFoundError:
         st.error(f"Error: No se encontró el archivo de datos históricos en: {HIST_PATH}")
         return pd.DataFrame() # Retornar un DataFrame vacío para evitar errores posteriores
@@ -62,13 +85,20 @@ def cargar_historico():
 
 def cargar_nuevas_predicciones():
     try:
-        if os.path.exists(NEW_DATA_PATH):
-            df = pd.read_excel(NEW_DATA_PATH, parse_dates=[0]) # No se usa index_col al cargar
+        if NEW_DATA_PATH.startswith("http"):
+            response = requests.get(NEW_DATA_PATH)
+            response.raise_for_status()
+            df = pd.read_excel(BytesIO(response.content), parse_dates=[0])
+        elif os.path.exists(NEW_DATA_PATH):
+            df = pd.read_excel(NEW_DATA_PATH, parse_dates=[0])
             print(f"Nuevas predicciones cargadas desde: {NEW_DATA_PATH}")
         else:
             df = pd.DataFrame()
             print(f"Archivo de nuevas predicciones no encontrado. Se creó un nuevo DataFrame vacío.")
         return df
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error al descargar el archivo de nuevas predicciones: {e}")
+        return pd.DataFrame()
     except Exception as e:
         st.error(f"Error al cargar o crear el archivo de nuevas predicciones: {e}")
         return pd.DataFrame()
@@ -209,14 +239,12 @@ def nueva_prediccion(modelo, nuevas_predicciones, meteo_days):
 
             # Guardar la predicción en un nuevo DataFrame y guardarlo en Excel
             nuevas_predicciones_df = pd.DataFrame([data])
+            # Si el archivo no existe, crearlo. Si existe, añadir la nueva predicción.
             if not os.path.exists(NEW_DATA_PATH):
                 nuevas_predicciones_df.to_excel(NEW_DATA_PATH, index=False)
             else:
-                # Read the existing excel file
                 existing_df = pd.read_excel(NEW_DATA_PATH)
-                # Append the new data
                 updated_df = pd.concat([existing_df, nuevas_predicciones_df], ignore_index=True)
-                # Write the combined data to the excel file
                 updated_df.to_excel(NEW_DATA_PATH, index=False)
 
             st.info(f"Predicción guardada en: {NEW_DATA_PATH}") # Informar al usuario
@@ -283,8 +311,20 @@ def ingresar_valor_real(nuevas_predicciones, nuevas_predicciones_dict):
                     nuevas_predicciones_df.loc[nuevas_predicciones_df["Fecha"] == fecha_prediccion, "Valor_Real"] = valor_real
 
                 # Guardar el DataFrame actualizado en el archivo Excel NUEVAS_PREDICCIONES_PATH
-                nuevas_predicciones_df.to_excel(NEW_DATA_PATH, index=False)
-                st.success(f"Valores reales guardados exitosamente en: {NEW_DATA_PATH}")
+                if NEW_DATA_PATH.startswith("http"):
+                    response = requests.get(NEW_DATA_PATH)
+                    response.raise_for_status()
+                    existing_df = pd.read_excel(BytesIO(response.content), parse_dates=[0])
+                    updated_df = pd.concat([existing_df, nuevas_predicciones_df], ignore_index=True)
+                    # Guardar a un archivo local temporal y luego subirlo (simplificado para demostración)
+                    temp_path = "temp_nuevas_predicciones.xlsx"
+                    updated_df.to_excel(temp_path, index=False)
+                    #st.warning("Subir archivos a GitHub directamente desde una aplicación Streamlit no es trivial.  Este código guarda los cambios localmente en 'temp_nuevas_predicciones.xlsx'.  Necesitarías implementar una solución más compleja (usando la API de GitHub) para subirlo al repositorio.")
+                    st.success(f"Valores reales guardados exitosamente en: {temp_path}.  Nota: Este archivo se guarda localmente y NO en el repositorio de GitHub.")
+
+                else:
+                    nuevas_predicciones_df.to_excel(NEW_DATA_PATH, index=False)
+                    st.success(f"Valores reales guardados exitosamente en: {NEW_DATA_PATH}")
             except Exception as e:
                 st.error(f"Error al guardar los valores reales: {e}")
         else:

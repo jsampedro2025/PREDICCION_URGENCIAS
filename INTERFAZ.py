@@ -174,8 +174,11 @@ def nueva_prediccion(modelo, nuevas_predicciones, meteo_days):
         print("Contenido de nuevas_predicciones DESPUÉS de concatenar:")
         print(nuevas_predicciones)
 
-        nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False para evitar una columna de índice innecesaria
-        st.info("Registro guardado en Nuevas_Predicciones.xlsx.")
+        try:
+            nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False para evitar una columna de índice innecesaria
+            st.info("Registro guardado en Nuevas_Predicciones.xlsx.")
+        except Exception as e:
+            st.error(f"Error al guardar en Nuevas_Predicciones.xlsx: {e}")
     return nuevas_predicciones
 
 def ingresar_valor_real(nuevas_predicciones):
@@ -202,8 +205,12 @@ def ingresar_valor_real(nuevas_predicciones):
                     print("Contenido de nuevas_predicciones justo antes de guardar:")
                     print(nuevas_predicciones)
 
-                    nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False
-                    st.rerun() # Volvemos a ejecutar la app para actualizar la tabla
+                    try:
+                        nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False
+                        st.success(f"Valor real guardado para la fecha: {fecha_editada.strftime('%d/%m/%Y')}")
+                        st.rerun() # Volvemos a ejecutar la app para actualizar la tabla
+                    except Exception as e:
+                        st.error(f"Error al guardar en Nuevas_Predicciones.xlsx después de ingresar valor real: {e}")
 
     edited_df = st.data_editor(
         pendientes[["Fecha", "Predicción", "Limite_Inferior", "Limite_Superior", "Valor Real"]],
@@ -235,16 +242,19 @@ def actualizar_dataset(nuevas_predicciones, historial):
         return historial, nuevas_predicciones
     if st.button("Actualizar Dataset"):
         historial = pd.concat([historial, nuevas_predicciones], ignore_index=True)
-        historial.to_excel(HIST_PATH, index=False) # Añadido index=False
-        st.success("Dataset principal actualizado. Reentrena el modelo con los nuevos datos.")
-        columnas = nuevas_predicciones.columns
-        nuevas_predicciones = pd.DataFrame(columns=columnas)
+        try:
+            historial.to_excel(HIST_PATH, index=False) # Añadido index=False
+            st.success("Dataset principal actualizado. Reentrena el modelo con los nuevos datos.")
+            columnas = nuevas_predicciones.columns
+            nuevas_predicciones = pd.DataFrame(columns=columnas)
 
-        print(f"Guardando nuevas predicciones (después de actualizar dataset) en: {NEW_DATA_PATH}")
-        print("Contenido de nuevas_predicciones justo antes de guardar:")
-        print(nuevas_predicciones)
+            print(f"Guardando nuevas predicciones (después de actualizar dataset) en: {NEW_DATA_PATH}")
+            print("Contenido de nuevas_predicciones justo antes de guardar:")
+            print(nuevas_predicciones)
 
-        nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False
+            nuevas_predicciones.to_excel(NEW_DATA_PATH, index=False) # Añadido index=False
+        except Exception as e:
+            st.error(f"Error al actualizar el dataset principal o al limpiar Nuevas_Predicciones.xlsx: {e}")
     return historial, nuevas_predicciones
 
 def ver_calendario_seleccion():
@@ -279,11 +289,4 @@ def main():
     elif opcion == "Ingresar/Ver Valor Real":
         nuevas_predicciones = ingresar_valor_real(nuevas_predicciones)
     elif opcion == "Actualizar Dataset":
-        historial, nuevas_predicciones = actualizar_dataset(nuevas_predicciones, historial)
-    elif opcion == "Ver Calendario y Selección":
-        ver_calendario_seleccion()
-
-    st.sidebar.info("Esta aplicación se ejecuta en la nube y es accesible desde cualquier dispositivo.")
-
-if __name__ == "__main__":
-    main()
+        historial,

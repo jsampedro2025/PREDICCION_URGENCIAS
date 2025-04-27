@@ -19,8 +19,8 @@ st.set_page_config(layout="wide", initial_sidebar_state="expanded")
 # ---------- CONFIGURACIÓN DE RUTAS ----------
 # BASE_DIR = r"D:\PREDICCION URGENCIAS\MODELO PREDICCION DE URGENCIAS" # Cambiar a la ruta correcta
 BASE_DIR = "https://raw.githubusercontent.com/jsampedro2025/PREDICCION_URGENCIAS/main"  # Ruta base del repositorio en GitHub
-MODEL_PATH = f"{BASE_DIR}/modelo_entrenado.pkl"  # Ruta del modelo
-HIST_PATH = f"{BASE_DIR}/historico_urgencias.xlsx"  # Ruta del histórico
+MODEL_PATH = f"{BASE_DIR}/modelo_prediccion_urgencias.pkl"  # Ruta del modelo
+HIST_PATH = f"{BASE_DIR}/DATASET_MEJORADO.xlsx"  # Ruta del histórico
 NEW_DATA_PATH = os.path.join(".", "Nuevas_Predicciones.xlsx") # Ruta local para el nuevo archivo de predicciones
 PRED_OBS_PATH = os.path.join(".", "Predicciones_Con_Observado.xlsx") # Nuevo path para el archivo con valores observados
 

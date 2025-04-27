@@ -23,7 +23,8 @@ MODEL_PATH = os.path.join(BASE_DIR, "modelo_prediccion_urgencias.pkl")
 HIST_PATH = os.path.join(BASE_DIR, "DATASET_MEJORADO.xlsx")
 
 # NEW_DATA_PATH: Ruta al archivo de nuevas predicciones (nombre exacto)
-NEW_DATA_PATH = os.path.join(BASE_DIR, "Nuevas_Predicciones.xlsx"
+NEW_DATA_PATH = os.path.join(BASE_DIR, "Nuevas_Predicciones.xlsx")
+
 # ---------- FUNCIONES CON CACHEO ----------
 @st.cache_resource
 def cargar_modelo():
